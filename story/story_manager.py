@@ -107,35 +107,42 @@ class Story:
 
     def save_to_storage(self):
         # Save locally
-        user_filename = input("Enter new save name: ")
+        while 1:
+            if(self.uuid):
+                print("Leave empty to rewrite old save.")
+            user_filename = input("Enter new save name: ")
+            if((not self.uuid) and user_filename == ""):
+                print("Enter valid name!")
+            else:
+                self.uuid = hashlib.md5(user_filename.encode()).hexdigest()
 
-        self.uuid = hashlib.md5(user_filename.encode()).hexdigest()
+                save_path = "./saved_stories/"
 
-        save_path = "./saved_stories/"
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
 
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-
-        story_json = self.to_json()
-        file_name = "story" + str(self.uuid) + ".json"
-        f = open(os.path.join(save_path, file_name), "w")
-        f.write(story_json)
-        f.close()
-        # Save config file
-        saves_file_path = os.path.join(save_path, "saves.json")
-        saves = {}
-        if(os.path.isfile(saves_file_path)):
-            f = open(saves_file_path, "rb")
-            saves = json.loads(f.read().decode())
-            f.close()
-        
-        saves[user_filename] = {"md5":self.uuid}
-        f = open(saves_file_path, "wb")
-        f.write(json.dumps(saves).encode())
-        f.close()
-        print("Game saved as {0}.".format(user_filename))
-        print("Game file is {0}".format(os.path.join(save_path, file_name)))
-        return self.uuid
+                story_json = self.to_json()
+                file_name = "story" + str(self.uuid) + ".json"
+                f = open(os.path.join(save_path, file_name), "w")
+                f.write(story_json)
+                f.close()
+                print("Game file is {0}".format(os.path.join(save_path, file_name)))
+                if(user_filename == ""):
+                    # File is written to db, we can skip it
+                    return self.uuid
+                # Save config file
+                saves_file_path = os.path.join(save_path, "saves.json")
+                saves = {}
+                if(os.path.isfile(saves_file_path)):
+                    f = open(saves_file_path, "rb")
+                    saves = json.loads(f.read().decode())
+                    f.close()
+                saves[user_filename] = {"md5":self.uuid}
+                f = open(saves_file_path, "wb")
+                f.write(json.dumps(saves).encode())
+                f.close()
+                print("Game saved as {0}.".format(user_filename))
+                return self.uuid
 
     def load_from_storage(self, story_id):
         save_path = "./saved_stories/"
@@ -151,7 +158,7 @@ class Story:
                 self.init_from_dict(game)
                 return str(self)
         else:
-            return "Error save not found locally."
+            return "Error save not found."
 
     def get_rating(self):
         return
