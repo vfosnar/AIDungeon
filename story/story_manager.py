@@ -6,6 +6,7 @@ from subprocess import Popen
 
 from story.utils import *
 
+import hashlib
 
 class Story:
     def __init__(
@@ -33,13 +34,13 @@ class Story:
         self.game_state = game_state
         self.memory = 20
 
-    def __del__(self):
-        if self.upload_story:
-            self.save_to_storage()
-            console_print("Game saved.")
-            console_print(
-                "To load the game, type 'load' and enter the following ID: " + self.uuid
-            )
+    #def __del__(self):
+    #    if self.upload_story:
+    #        self.save_to_storage()
+    #        console_print("Game saved.")
+    #        console_print(
+    #            "To load the game, type 'load' and enter the following ID: " + self.uuid
+    #        )
 
     def init_from_dict(self, story_dict):
         self.story_start = story_dict["story_start"]
@@ -106,8 +107,9 @@ class Story:
 
     def save_to_storage(self):
         # Save locally
-        
-        self.uuid = str(uuid.uuid1())
+        user_filename = input("Enter new save name: ")
+
+        self.uuid = hashlib.md5(user_filename.encode()).hexdigest()
 
         save_path = "./saved_stories/"
 
@@ -119,6 +121,20 @@ class Story:
         f = open(os.path.join(save_path, file_name), "w")
         f.write(story_json)
         f.close()
+        # Save config file
+        saves_file_path = os.path.join(save_path, "saves.json")
+        saves = {}
+        if(os.path.isfile(saves_file_path)):
+            f = open(saves_file_path, "rb")
+            saves = json.loads(f.read().decode())
+            f.close()
+        
+        saves[user_filename] = {"md5":self.uuid}
+        f = open(saves_file_path, "wb")
+        f.write(json.dumps(saves).encode())
+        f.close()
+        print("Game saved as {0}.".format(user_filename))
+        print("Game file is {0}".format(os.path.join(save_path, file_name)))
         return self.uuid
 
     def load_from_storage(self, story_id):

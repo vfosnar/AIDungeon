@@ -1,6 +1,13 @@
 # AIDungeon2
-Modified and conda-compatible version of AIDungeon.
+Modified and anaconda-compatible version of AIDungeon.
 Clone of [this](https://github.com/Latitude-Archives/AIDungeon).
+# Added features
+- Windows compatible install
+- Disabled uploading, rating
+- Added argument parser for tuning GPT2
+- Loads game from local storage by default
+- Uses "save name" instead of random uuid (but game will now not save on Ctrl-C)
+- Added aliases to /quit
 # Installation
     git clone https://github.com/vfosnar/AIDungeon.git
     cd AIDungeon/

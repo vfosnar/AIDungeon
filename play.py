@@ -4,6 +4,8 @@ import random
 import sys
 import time
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 from generator.gpt2.gpt2_generator import *
 from story import grammars
 from story.story_manager import *
@@ -11,8 +13,8 @@ from story.utils import *
 
 import argparse
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-
+from platform import system
+system_name = system()
 
 def splash():
     print("0) New Game\n1) Load Game\n")
@@ -147,18 +149,42 @@ def instructions():
     text += '\n  "/censor off/on" to turn censoring off or on.'
     return text
 
+def load_story_get_id():
+    save_path = "./saved_stories/"
+    saves_file_path = os.path.join(save_path, "saves.json")
+    saves = {}
+    if(os.path.isfile(saves_file_path)):
+        f = open(saves_file_path, "rb")
+        saves = json.loads(f.read().decode())
+        f.close()
+    
+    while 1:
+        hashes_by_index = {}
+        for i, story in enumerate(saves):
+            print("{0}) {1}".format(i, story))
+            hashes_by_index[i] = saves[story]["md5"]
+        try:
+            story_index = int(input("Enter story index: "))
+            if(story_index in hashes_by_index):
+                return hashes_by_index[story_index]
+            print("Wrong save index!")
+        except:
+            print("Index must be a number!")
 
 def play_aidungeon_2(a_temp, a_censor, a_generate):
     # Must be set to true so story will be saved locally,
     # uploading will not happen
     upload_story = True
-
-    print("""\nInitializing AI Dungeon! (This might take a few minutes)
-with parameters: temp={0}, censor={1}, generate={2}\n""".format(a_temp, a_censor, a_generate))
+    print("\n========================================================")
+    print("Initializing AI Dungeon! (This might take a few minutes)\nwith parameters:\ntemp={0}\ncensor={1}\ngenerate={2}".format(a_temp, a_censor, a_generate))
+    print("========================================================\n")
 
     generator = GPT2Generator(temperature=a_temp, censor=a_censor, generate_num=a_generate)
     story_manager = UnconstrainedStoryManager(generator)
-    print("\n")
+    if(system_name == "Windows"):
+        os.system("cls")
+    else:
+        os.system("clear")
 
     with open("opening.txt", "r", encoding="utf-8") as file:
         starter = file.read()
@@ -200,7 +226,7 @@ with parameters: temp={0}, censor={1}, generate={2}\n""".format(a_temp, a_censor
                 console_print(result)
 
             else:
-                load_ID = input("What is the ID of the saved game? ")
+                load_ID = load_story_get_id()
                 result = story_manager.load_new_story(
                     load_ID, upload_story=upload_story
                 )
@@ -225,14 +251,9 @@ with parameters: temp={0}, censor={1}, generate={2}\n""".format(a_temp, a_censor
                     console_print(story_manager.story.story_start)
                     continue
 
-                elif command == "quit":
-                    story_manager.story.get_rating()
+                elif command in ["quit", "exit", "stop", "return"]:
+                    id = story_manager.story.save_to_storage()
                     exit()
-
-                elif command == "nosaving":
-                    upload_story = False
-                    story_manager.story.upload_story = False
-                    console_print("Saving turned off.")
 
                 elif command == "help":
                     console_print(instructions())
@@ -261,19 +282,11 @@ with parameters: temp={0}, censor={1}, generate={2}\n""".format(a_temp, a_censor
                         console_print("Invalid argument: {}".format(args[0]))
 
                 elif command == "save":
-                    if upload_story:
-                        id = story_manager.story.save_to_storage()
-                        console_print("Game saved.")
-                        console_print(
-                            "To load the game, type 'load' and enter the "
-                            "following ID: {}".format(id)
-                        )
-                    else:
-                        console_print("Saving has been turned off. Cannot save.")
+                    id = story_manager.story.save_to_storage()
 
                 elif command == "load":
                     if len(args) == 0:
-                        load_ID = input("What is the ID of the saved game?")
+                        load_ID = load_story_get_id()
                     else:
                         load_ID = args[0]
                     result = story_manager.story.load_from_storage(load_ID)
@@ -366,6 +379,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--temp", help="adjust creativity of GPT2 model", type=float, default=0.4)
     parser.add_argument("--censor", help="censor output", type=bool, default=False)
-    parser.add_argument("--generate", help="", type=int, default=60)
+    parser.add_argument("--generate", help="length of text generated", type=int, default=60)
     args = parser.parse_args()
     play_aidungeon_2(args.temp, args.censor, args.generate)
