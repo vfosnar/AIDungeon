@@ -1,3 +1,4 @@
 generator/gpt2/models/model_v5/
 saved_stories/*
 *__pycache__
+.vscode/*
