@@ -247,7 +247,7 @@ def play_aidungeon_2(a_temp, a_censor, a_generate):
                 command = split[0].lower()
                 args = split[1:]
                 if command == "reset":
-                    story_manager.story.get_rating()
+                    id = story_manager.story.save_to_storage()
                     break
 
                 elif command == "restart":
