@@ -164,7 +164,10 @@ def load_story_get_id():
             print("{0}) {1}".format(i, story))
             hashes_by_index[i] = saves[story]["md5"]
         try:
-            story_index = int(input("Enter story index: "))
+            story_index_input = input("Enter story index: ")
+            if(story_index_input == ""):
+                return None
+            story_index = int(story_index_input)
             if(story_index in hashes_by_index):
                 return hashes_by_index[story_index]
             print("Wrong save index!")
@@ -227,6 +230,9 @@ def play_aidungeon_2(a_temp, a_censor, a_generate):
 
             else:
                 load_ID = load_story_get_id()
+                if(not load_ID):
+                    print("Load aborted.")
+                    exit(0)
                 result = story_manager.load_new_story(
                     load_ID, upload_story=upload_story
                 )
@@ -287,6 +293,9 @@ def play_aidungeon_2(a_temp, a_censor, a_generate):
                 elif command == "load":
                     if len(args) == 0:
                         load_ID = load_story_get_id()
+                        if(not load_ID):
+                            console_print("Load aborted. ")
+                            continue
                     else:
                         load_ID = args[0]
                     result = story_manager.story.load_from_storage(load_ID)

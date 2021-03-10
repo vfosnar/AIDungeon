@@ -114,7 +114,8 @@ class Story:
             if((not self.uuid) and user_filename == ""):
                 print("Enter valid name!")
             else:
-                self.uuid = hashlib.md5(user_filename.encode()).hexdigest()
+                if(user_filename != ""):
+                    self.uuid = hashlib.md5(user_filename.encode()).hexdigest()
 
                 save_path = "./saved_stories/"
 
