@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ===== SETUP =====
 import os
 import random
 import sys
@@ -10,60 +11,92 @@ from generator.gpt2.gpt2_generator import *
 from story import grammars
 from story.story_manager import *
 from story.utils import *
-
 import argparse
 
 from platform import system
 system_name = system()
+# =================
 
-def splash():
-    print("0) New Game\n1) Load Game\n")
-    choice = get_num_options(2)
 
-    if choice == 1:
-        return "load"
+
+def logo():
+    # Display logo
+    with open("opening.txt", "r", encoding="utf-8") as file:
+        starter = file.read()
+    print(starter)
+
+def clear():
+    # Clear screen
+    if(system_name == "Windows"):
+        os.system("cls")
     else:
-        return "new"
+        os.system("clear")
+
+def ui_menu():
+    clear()
+    logo()
+    
+    # Prompt user
+    print("0) Exit\n1) New Game\n2) Saves")
+    choice = get_num_options(3)
+
+    return choice
 
 
-def random_story(story_data):
-    # random setting
-    settings = story_data["settings"].keys()
-    n_settings = len(settings)
-    n_settings = 2
-    rand_n = random.randint(0, n_settings - 1)
-    for i, setting in enumerate(settings):
-        if i == rand_n:
-            setting_key = setting
 
-    # random character
-    characters = story_data["settings"][setting_key]["characters"]
-    n_characters = len(characters)
-    rand_n = random.randint(0, n_characters - 1)
-    for i, character in enumerate(characters):
-        if i == rand_n:
-            character_key = character
+# ===== SAVES =====
+def ui_menu_saves():
+    # Load saves file
+    save_path = "./saved_stories/"
+    saves_file_path = os.path.join(save_path, "saves.json")
+    saves = {}
+    if(os.path.isfile(saves_file_path)):
+        with open(saves_file_path, "r", encoding="utf-8") as file:
+            saves = json.loads(file.read())
+    
+    while 1:
+        print()
+        print("Select story")
+        # Print saves
+        hashes_by_index = {}
+        print("0) Back")
+        for i, story in enumerate(saves):
+            print("{0}) {1}".format(i+1, story))
+            hashes_by_index[i] = saves[story]["md5"]
+        
+        # Prompt user
+        choice = get_num_options(len(saves) + 1)
+        if(choice == 0): return 0, 0, 0
 
-    # random name
-    name = grammars.direct(setting_key, "character_name")
+        choice_action = ui_menu_saves_game()
+        if(choice_action != 0):
+            return choice_action, hashes_by_index[choice - 1], list(saves)[choice - 1]
 
-    return setting_key, character_key, name, None, None
+def ui_menu_saves_game():
+    print()
+    print("0) Back\n1) Play\n2) Remove")
+    choice = get_num_options(3)
+    return choice
+# =================
 
 
-def select_game():
+
+# ===== New Game =====
+def ui_menu_new():
     with open(YAML_FILE, "r") as stream:
         data = yaml.safe_load(stream)
 
-    # Random story?
-    print("Random story?")
-    console_print("0) yes")
-    console_print("1) no")
-    choice = get_num_options(2)
+    print()
+    print("Select how to generate story")
+    print("0) Back\n1) Random\n2) Prompts")
+    choice = get_num_options(3)
 
     if choice == 0:
-        return random_story(data)
-
-    # User-selected story...
+        return 0, None, None, None, None
+    elif choice == 1:
+        return ui_menu_new_random(data)
+    
+    # Prompts
     print("\n\nPick a setting.")
     settings = data["settings"].keys()
     for i, setting in enumerate(settings):
@@ -92,8 +125,30 @@ def select_game():
 
     return setting_key, character_key, name, character, setting_description
 
+def ui_menu_new_random(story_data):
+    # random setting
+    settings = story_data["settings"].keys()
+    n_settings = len(settings)
+    n_settings = 2
+    rand_n = random.randint(0, n_settings - 1)
+    for i, setting in enumerate(settings):
+        if i == rand_n:
+            setting_key = setting
 
-def get_custom_prompt():
+    # random character
+    characters = story_data["settings"][setting_key]["characters"]
+    n_characters = len(characters)
+    rand_n = random.randint(0, n_characters - 1)
+    for i, character in enumerate(characters):
+        if i == rand_n:
+            character_key = character
+
+    # random name
+    name = grammars.direct(setting_key, "character_name")
+
+    return setting_key, character_key, name, None, None
+
+def ui_menu_new_custom():
     context = ""
     console_print(
         "\nEnter a prompt that describes who you are and the first couple sentences of where you start "
@@ -103,8 +158,7 @@ def get_custom_prompt():
     prompt = input("Starting Prompt: ")
     return context, prompt
 
-
-def get_curated_exposition(
+def ui_menu_new_curated(
     setting_key, character_key, name, character, setting_description
 ):
     name_token = "<NAME>"
@@ -132,7 +186,6 @@ def get_curated_exposition(
 
     return context, prompt
 
-
 def instructions():
     text = "\nAI Dungeon 2 Instructions:"
     text += '\n Enter actions starting with a verb ex. "go to the tavern" or "attack the orc."'
@@ -140,58 +193,46 @@ def instructions():
     text += "\n\nThe following commands can be entered for any action: "
     text += '\n  "/revert"   Reverts the last action allowing you to pick a different action.'
     text += '\n  "/quit"     Quits the game and saves'
-    text += '\n  "/reset"    Starts a new game and saves your current one'
     text += '\n  "/restart"  Starts the game from beginning with same settings'
     text += '\n  "/save"     Makes a new save of your game and gives you the save ID'
-    text += '\n  "/load"     Asks for a save ID and loads the game if the ID is valid'
     text += '\n  "/print"    Prints a transcript of your adventure (without extra newline formatting)'
     text += '\n  "/help"     Prints these instructions again'
     text += '\n  "/censor off/on" to turn censoring off or on.'
     return text
+# ====================
 
-def load_story_get_id():
-    save_path = "./saved_stories/"
-    saves_file_path = os.path.join(save_path, "saves.json")
-    saves = {}
-    if(os.path.isfile(saves_file_path)):
-        f = open(saves_file_path, "rb")
-        saves = json.loads(f.read().decode())
-        f.close()
+
+
+# ===== GAME MENU =====
+def ui_game_save(story_manager):
+    print()
+    print("0) Back\n1) Save as")
+    if(story_manager.story.uuid != None): print("2) Save")
+
+    choice = get_num_options(3 if (story_manager.story.uuid != None) else 2)
+    if choice == 0: return 0
+
+    savename = None
+    if choice == 1: # Save as
+        # Set savename
+        while 1:
+            print()
+            print("Enter new save name:")
+            savename = input()
+            if(savename != ""): break
     
-    while 1:
-        hashes_by_index = {}
-        for i, story in enumerate(saves):
-            print("{0}) {1}".format(i, story))
-            hashes_by_index[i] = saves[story]["md5"]
-        try:
-            story_index_input = input("Enter story index: ")
-            if(story_index_input == ""):
-                return None
-            story_index = int(story_index_input)
-            if(story_index in hashes_by_index):
-                return hashes_by_index[story_index]
-            print("Wrong save index!")
-        except:
-            print("Index must be a number!")
+    story_manager.story.save_to_storage(savename)
+# =====================
+
+
 
 def play_aidungeon_2(a_temp, a_censor, a_generate):
-    # Must be set to true so story will be saved locally,
-    # uploading will not happen
-    upload_story = True
     print("\n========================================================")
     print("Initializing AI Dungeon! (This might take a few minutes)\nwith parameters:\ntemp={0}\ncensor={1}\ngenerate={2}".format(a_temp, a_censor, a_generate))
     print("========================================================\n")
 
     generator = GPT2Generator(temperature=a_temp, censor=a_censor, generate_num=a_generate)
     story_manager = UnconstrainedStoryManager(generator)
-    if(system_name == "Windows"):
-        os.system("cls")
-    else:
-        os.system("clear")
-
-    with open("opening.txt", "r", encoding="utf-8") as file:
-        starter = file.read()
-    print(starter)
 
     while True:
         if story_manager.story != None:
@@ -199,44 +240,81 @@ def play_aidungeon_2(a_temp, a_censor, a_generate):
 
         while story_manager.story is None:
             print("\n\n")
-            splash_choice = splash()
+            ui_menu_choice = ui_menu()
+            
+            if ui_menu_choice == 0: # Exit game
+                exit(0)
 
-            if splash_choice == "new":
-                print("\n\n")
+            if ui_menu_choice == 1: # New game
                 (
                     setting_key,
                     character_key,
                     name,
                     character,
                     setting_description,
-                ) = select_game()
+                ) = ui_menu_new()
+                
+                if setting_key == 0:
+                    continue
 
                 if setting_key == "custom":
-                    context, prompt = get_custom_prompt()
+                    context, prompt = ui_menu_new_custom()
 
                 else:
-                    context, prompt = get_curated_exposition(
+                    context, prompt = ui_menu_new_curated(
                         setting_key, character_key, name, character, setting_description
                     )
 
-                console_print(instructions())
                 print("\nGenerating story...")
 
                 result = story_manager.start_new_story(
-                    prompt, context=context, upload_story=upload_story
+                    prompt, context=context
                 )
-                print("\n")
+
+                clear()
+                logo()
+
+                console_print(instructions())
+
+                print("\n\n")
+
                 console_print(result)
 
-            else:
-                load_ID = load_story_get_id()
-                if(not load_ID):
-                    print("Load aborted.")
-                    exit(0)
-                result = story_manager.load_new_story(
-                    load_ID, upload_story=upload_story
-                )
+            else: # Load game
+                while 1:
+                    choice_action, choice_story_id, choice_story_savename = ui_menu_saves()
+                    if(choice_action == 0): # Back
+                        break
+                    if(choice_action == 2): # Remove save
+
+                        save_path = "./saved_stories/"
+                        saves_file_path = os.path.join(save_path, "saves.json")
+                        saves = {}
+                        # Load current saves
+                        if(os.path.isfile(saves_file_path)):
+                            with open(saves_file_path, "r", encoding="utf-8") as file:
+                                saves = json.loads(file.read())
+                        # Remove savefile
+                        os.remove(os.path.join(save_path, "story" + choice_story_id + ".json"))
+                        saves.pop(choice_story_savename)
+                        # Update file
+                        with open(saves_file_path, "w", encoding="utf-8") as file:
+                            file.write(json.dumps(saves))
+                    else:
+                        # Load game
+                        break
+                if(choice_story_id == 0):
+                    # "Back" was selected, display menu again
+                    continue
+
+                # Load game
                 print("\nLoading Game...\n")
+
+                result = story_manager.load_new_story(choice_story_id)
+
+                clear()
+                logo()
+
                 console_print(result)
 
         while True:
@@ -246,20 +324,20 @@ def play_aidungeon_2(a_temp, a_censor, a_generate):
                 split = action[1:].split(" ")  # removes preceding slash
                 command = split[0].lower()
                 args = split[1:]
-                if command == "reset":
-                    id = story_manager.story.save_to_storage()
-                    break
 
-                elif command == "restart":
+                if command == "restart":
                     story_manager.story.actions = []
                     story_manager.story.results = []
                     console_print("Game restarted.")
                     console_print(story_manager.story.story_start)
                     continue
 
-                elif command in ["quit", "exit", "stop", "return"]:
-                    id = story_manager.story.save_to_storage()
-                    exit()
+                elif command in ["quit", "exit", "stop", "return", "menu"]:
+                    id = ui_game_save(story_manager)
+                    if(id != 0):
+                        time.sleep(2)
+                        story_manager.story = None
+                        break
 
                 elif command == "help":
                     console_print(instructions())
@@ -288,20 +366,8 @@ def play_aidungeon_2(a_temp, a_censor, a_generate):
                         console_print("Invalid argument: {}".format(args[0]))
 
                 elif command == "save":
-                    id = story_manager.story.save_to_storage()
-
-                elif command == "load":
-                    if len(args) == 0:
-                        load_ID = load_story_get_id()
-                        if(not load_ID):
-                            console_print("Load aborted. ")
-                            continue
-                    else:
-                        load_ID = args[0]
-                    result = story_manager.story.load_from_storage(load_ID)
-                    console_print("\nLoading Game...\n")
-                    console_print(result)
-
+                    ui_game_save()
+                
                 elif command == "print":
                     print("\nPRINTING\n")
                     print(str(story_manager.story))

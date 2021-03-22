@@ -10,12 +10,11 @@ import hashlib
 
 class Story:
     def __init__(
-        self, story_start, context="", seed=None, game_state=None, upload_story=False
+        self, story_start, context="", seed=None, game_state=None
     ):
         self.story_start = story_start
         self.context = context
         self.rating = -1
-        self.upload_story = upload_story
 
         # list of actions. First action is the prompt length should always equal that of story blocks
         self.actions = []
@@ -33,14 +32,6 @@ class Story:
             game_state = dict()
         self.game_state = game_state
         self.memory = 20
-
-    #def __del__(self):
-    #    if self.upload_story:
-    #        self.save_to_storage()
-    #        console_print("Game saved.")
-    #        console_print(
-    #            "To load the game, type 'load' and enter the following ID: " + self.uuid
-    #        )
 
     def init_from_dict(self, story_dict):
         self.story_start = story_dict["story_start"]
@@ -105,45 +96,37 @@ class Story:
 
         return json.dumps(story_dict)
 
-    def save_to_storage(self):
+    def save_to_storage(self, savename = None):
         # Save locally
-        while 1:
-            if(self.uuid):
-                print("Leave empty to rewrite old save.")
-            user_filename = input("Enter new save name: ")
-            if((not self.uuid) and user_filename == ""):
-                print("Enter valid name!")
-            else:
-                if(user_filename != ""):
-                    self.uuid = hashlib.md5(user_filename.encode()).hexdigest()
+        if(savename != None):
+            self.uuid = hashlib.md5(savename.encode()).hexdigest()
+        save_path = "./saved_stories/"
 
-                save_path = "./saved_stories/"
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
 
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
-
-                story_json = self.to_json()
-                file_name = "story" + str(self.uuid) + ".json"
-                f = open(os.path.join(save_path, file_name), "w")
-                f.write(story_json)
-                f.close()
-                print("Game file is {0}".format(os.path.join(save_path, file_name)))
-                if(user_filename == ""):
-                    # File is written to db, we can skip it
-                    return self.uuid
-                # Save config file
-                saves_file_path = os.path.join(save_path, "saves.json")
-                saves = {}
-                if(os.path.isfile(saves_file_path)):
-                    f = open(saves_file_path, "rb")
-                    saves = json.loads(f.read().decode())
-                    f.close()
-                saves[user_filename] = {"md5":self.uuid}
-                f = open(saves_file_path, "wb")
-                f.write(json.dumps(saves).encode())
-                f.close()
-                print("Game saved as {0}.".format(user_filename))
-                return self.uuid
+        story_json = self.to_json()
+        file_name = "story" + str(self.uuid) + ".json"
+        with open(os.path.join(save_path, file_name), "w", encoding="utf-8") as file:
+            file.write(story_json)
+        
+        print("Game file is {0}".format(os.path.join(save_path, file_name)))
+        if(savename == None):
+            # File must be written to db, we can skip writing it again
+            return self.uuid
+        # Save config file
+        saves_file_path = os.path.join(save_path, "saves.json")
+        saves = {}
+        if(os.path.isfile(saves_file_path)):
+            with open(saves_file_path, "r", encoding="utf-8") as file:
+                saves = json.loads(file.read())
+        saves[savename] = {"md5":self.uuid}
+        
+        with open(saves_file_path, "w", encoding="utf-8") as file:
+            file.write(json.dumps(saves))
+        
+        print("Game saved as {0}.".format(savename))
+        return self.uuid
 
     def load_from_storage(self, story_id):
         save_path = "./saved_stories/"
@@ -154,7 +137,7 @@ class Story:
         file_name = "story" + story_id + ".json"
         exists = os.path.isfile(os.path.join(save_path, file_name))
         if exists:
-            with open(os.path.join(save_path, file_name), "r") as fp:
+            with open(os.path.join(save_path, file_name), "r", encoding="utf-8") as fp:
                 game = json.load(fp)
                 self.init_from_dict(game)
                 return str(self)
@@ -171,7 +154,7 @@ class StoryManager:
         self.story = None
 
     def start_new_story(
-        self, story_prompt, context="", game_state=None, upload_story=False
+        self, story_prompt, context="", game_state=None
     ):
         block = self.generator.generate(context + story_prompt)
         block = cut_trailing_sentence(block)
@@ -179,11 +162,10 @@ class StoryManager:
             context + story_prompt + block,
             context=context,
             game_state=game_state,
-            upload_story=upload_story,
         )
         return str(self.story)
 
-    def load_new_story(self, story_id, upload_story=False):
+    def load_new_story(self, story_id):
         save_path = "./saved_stories/"
         
         if not os.path.exists(save_path):
@@ -194,7 +176,7 @@ class StoryManager:
         if exists:
             with open(os.path.join(save_path, file_name), "r") as fp:
                 game = json.load(fp)
-            self.story = Story("", upload_story=upload_story)
+            self.story = Story("")
             self.story.init_from_dict(game)
             return str(self.story)
         else:
